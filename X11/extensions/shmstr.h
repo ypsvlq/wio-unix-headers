@@ -24,31 +24,40 @@ in this Software without prior written authorization from The Open Group.
 
 ********************************************************/
 
-/* RANDOM CRUFT! THIS HAS NO OFFICIAL X CONSORTIUM OR X PROJECT TEAM BLESSING */
+/* THIS IS NOT AN X CONSORTIUM STANDARD OR AN X PROJECT TEAM SPECIFICATION */
 
-#ifndef _XMITMISC_H_
-#define _XMITMISC_H_
+#ifndef _SHMSTR_H_
+#define _SHMSTR_H_
 
-#include <X11/Xfuncproto.h>
-#include <X11/extensions/mitmiscconst.h>
+#include <X11/extensions/shmproto.h>
 
-_XFUNCPROTOBEGIN
+#ifdef _XSHM_SERVER_
+#define XSHM_PUT_IMAGE_ARGS \
+    DrawablePtr		/* dst */, \
+    GCPtr		/* pGC */, \
+    int			/* depth */, \
+    unsigned int	/* format */, \
+    int			/* w */, \
+    int			/* h */, \
+    int			/* sx */, \
+    int			/* sy */, \
+    int			/* sw */, \
+    int			/* sh */, \
+    int			/* dx */, \
+    int			/* dy */, \
+    char *		/* data */
 
-Bool XMITMiscQueryExtension(
-    Display*		/* dpy */,
-    int*		/* event_basep */,
-    int*		/* error_basep */
-);
+#define XSHM_CREATE_PIXMAP_ARGS \
+    ScreenPtr	/* pScreen */, \
+    int		/* width */, \
+    int		/* height */, \
+    int		/* depth */, \
+    char *	/* addr */
 
-Status XMITMiscSetBugMode(
-    Display*		/* dpy */,
-    Bool		/* onOff */
-);
-
-Bool XMITMiscGetBugMode(
-    Display*		/* dpy */
-);
-
-_XFUNCPROTOEND
-
+typedef struct _ShmFuncs {
+    PixmapPtr	(* CreatePixmap)(XSHM_CREATE_PIXMAP_ARGS);
+    void	(* PutImage)(XSHM_PUT_IMAGE_ARGS);
+} ShmFuncs, *ShmFuncsPtr;
 #endif
+
+#endif /* _SHMSTR_H_ */
