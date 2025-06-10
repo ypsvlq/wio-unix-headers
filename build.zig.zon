@@ -1,0 +1,6 @@
+.{
+    .name = .wio_unix_headers,
+    .version = "0.0.0",
+    .fingerprint = 0x3070ff125cdfe7b1,
+    .paths = .{""},
+}
