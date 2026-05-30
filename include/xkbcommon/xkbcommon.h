@@ -737,6 +737,7 @@ xkb_utf32_to_keysym(uint32_t ucs);
  *
  * @since 0.8.0: Initial implementation, based on `libX11`.
  * @since 1.8.0: Use Unicode 16.0 mappings for complete Unicode coverage.
+ * @since 1.12.0: Update to Unicode 17.0.
  */
 XKB_EXPORT xkb_keysym_t
 xkb_keysym_to_upper(xkb_keysym_t ks);
@@ -753,6 +754,7 @@ xkb_keysym_to_upper(xkb_keysym_t ks);
  *
  * @since 0.8.0: Initial implementation, based on `libX11`.
  * @since 1.8.0: Use Unicode 16.0 mappings for complete Unicode coverage.
+ * @since 1.12.0: Update to Unicode 17.0.
  */
 XKB_EXPORT xkb_keysym_t
 xkb_keysym_to_lower(xkb_keysym_t ks);
@@ -774,7 +776,9 @@ xkb_keysym_to_lower(xkb_keysym_t ks);
  *
  * The user may set some environment variables which affect the library:
  *
- * - `XKB_CONFIG_ROOT`, `XKB_CONFIG_EXTRA_PATH`, `XDG_CONFIG_DIR`, `HOME` - see @ref include-path.
+ * - `XKB_CONFIG_ROOT`, `XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH`,
+ *   `XKB_CONFIG_VERSIONED_EXTENSIONS_PATH`, `XKB_CONFIG_EXTRA_PATH`,
+ *   `XDG_CONFIG_DIR`, `HOME` - see @ref include-path.
  * - `XKB_LOG_LEVEL` - see `xkb_context::xkb_context_set_log_level()`.
  * - `XKB_LOG_VERBOSITY` - see `xkb_context::xkb_context_set_log_verbosity()`.
  * - `XKB_DEFAULT_RULES`, `XKB_DEFAULT_MODEL`, `XKB_DEFAULT_LAYOUT`,
@@ -785,7 +789,15 @@ xkb_keysym_to_lower(xkb_keysym_t ks);
 enum xkb_context_flags {
     /** Do not apply any context flags. */
     XKB_CONTEXT_NO_FLAGS = 0,
-    /** Create this context with an empty include path. */
+    /**
+     * Create this context with an empty include path.
+     *
+     * This may be useful e.g.:
+     * - to have full control over the included paths;
+     * - for clients that do not need to access the XKB directories, e.g.
+     *   if only retrieving keymap from the Wayland or X server. It avoids
+     *   potential issues with directory access permissions.
+     */
     XKB_CONTEXT_NO_DEFAULT_INCLUDES = (1 << 0),
     /**
      * Don’t take RMLVO names from the environment.
@@ -869,15 +881,25 @@ xkb_context_get_user_data(struct xkb_context *context);
  * include statement is encountered during keymap compilation.
  *
  * The default include paths are, in that lookup order:
- * - The path `$XDG_CONFIG_HOME/xkb`, with the usual `XDG_CONFIG_HOME`
- *   fallback to `$HOME/.config/` if unset.
- * - The path `$HOME/.xkb`, where $HOME is the value of the environment
+ * - The path `$XDG_CONFIG_HOME/xkb`, where `$XDG_CONFIG_HOME` is the value of
+     the environment variable `XDG_CONFIG_HOME`, with the usual fallback to
+     `$HOME/.config/` if unset.
+ * - The path `$HOME/.xkb`, where `$HOME` is the value of the environment
  *   variable `HOME`.
  * - The `XKB_CONFIG_EXTRA_PATH` environment variable, if defined, otherwise the
  *   system configuration directory, defined at library configuration time
  *   (usually `/etc/xkb`).
+ * - Each subdirectory of each XKB extensions directory (versioned, then
+ *   unversioned if no corresponding versioned subdirectory), listed in
+ *   lexicographic order. The extensions directories are defined by the
+ *   environment variables `XKB_CONFIG_VERSIONED_EXTENSIONS_PATH` and
+ *   `XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH` and default to the system XKB
+ *   root extensions directories, defined at library configuration time (usually
+ *   `/usr/share/xkeyboard-config-<VERSION>.d` and
+ *   `/usr/share/xkeyboard-config.d`).
  * - The `XKB_CONFIG_ROOT` environment variable, if defined, otherwise
- *   the system XKB root, defined at library configuration time.
+ *   the system XKB root, defined at library configuration time
+ *   (usually `/usr/share/xkeyboard-config-<VERSION>` or `/usr/share/X11/xkb`).
  *
  * @{
  */
@@ -896,7 +918,7 @@ xkb_context_include_path_append(struct xkb_context *context, const char *path);
 /**
  * Append the default include paths to the context’s include path.
  *
- * @returns 1 on success, or 0 if the primary include path could not be added.
+ * @returns 1 on success, or 0 if no default include path could be added.
  *
  * @memberof xkb_context
  */
@@ -1324,6 +1346,36 @@ xkb_keymap_unref(struct xkb_keymap *keymap);
 #define XKB_KEYMAP_USE_ORIGINAL_FORMAT ((enum xkb_keymap_format) -1)
 
 /**
+ * Flags to control keymap serialization.
+ *
+ * @since 1.12.0
+ */
+enum xkb_keymap_serialize_flags {
+    /** Do not apply any flags. */
+    XKB_KEYMAP_SERIALIZE_NO_FLAGS = 0,
+    /** Enable pretty-printing */
+    XKB_KEYMAP_SERIALIZE_PRETTY = (1 << 0),
+    /** Do not drop unused bits (key types, compatibility entries) */
+    XKB_KEYMAP_SERIALIZE_KEEP_UNUSED = (1 << 1),
+};
+
+/**
+ * Get the compiled keymap as a string.
+ *
+ * Same as `xkb_keymap::xkb_keymap_get_as_string2()` using
+ * `::XKB_KEYMAP_SERIALIZE_NO_FLAGS`.
+ *
+ * @since 1.12.0: Drop unused types and compatibility entries and do not
+ * pretty-print.
+ *
+ * @sa `xkb_keymap::xkb_keymap_get_as_string2()`
+ * @memberof xkb_keymap
+ */
+XKB_EXPORT char *
+xkb_keymap_get_as_string(struct xkb_keymap *keymap,
+                         enum xkb_keymap_format format);
+
+/**
  * Get the compiled keymap as a string.
  *
  * @param keymap The keymap to get as a string.
@@ -1331,22 +1383,28 @@ xkb_keymap_unref(struct xkb_keymap *keymap);
  * in the special value `::XKB_KEYMAP_USE_ORIGINAL_FORMAT` to use the format
  * from which the keymap was originally created. When used as an *interchange*
  * format such as Wayland <code>[xkb_v1]</code>, the format should be explicit.
+ * @param flags  Optional flags to control the serialization, or 0.
  *
  * @returns The keymap as a `NULL`-terminated string, or `NULL` if unsuccessful.
  *
- * The returned string may be fed back into `xkb_keymap_new_from_string()` to
- * get the exact same keymap (possibly in another process, etc.).
+ * The returned string may be fed back into `xkb_keymap_new_from_string()`
+ * to get the exact same keymap (possibly in another process, etc.).
  *
  * The returned string is *dynamically allocated* and should be freed by the
  * caller.
  *
+ * @since 1.12.0
+ *
+ * @sa `xkb_keymap_get_as_string()`
+ * @sa `xkb_keymap_new_from_string()`
  * @memberof xkb_keymap
  *
  * [xkb_v1]: https://wayland.freedesktop.org/docs/html/apa.html#protocol-spec-wl_keyboard-enum-keymap_format
  */
 XKB_EXPORT char *
-xkb_keymap_get_as_string(struct xkb_keymap *keymap,
-                         enum xkb_keymap_format format);
+xkb_keymap_get_as_string2(struct xkb_keymap *keymap,
+                          enum xkb_keymap_format format,
+                          enum xkb_keymap_serialize_flags flags);
 
 /** @} */
 
