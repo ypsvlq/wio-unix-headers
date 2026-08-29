@@ -25,6 +25,7 @@ protocols='
     unstable/relative-pointer/relative-pointer-unstable-v1
     unstable/text-input/text-input-unstable-v3
     unstable/pointer-gestures/pointer-gestures-unstable-v1
+    unstable/primary-selection/primary-selection-unstable-v1
 '
 urls='
     https://cvsweb.openbsd.org/checkout/src/include/sndio.h?rev=1.17
